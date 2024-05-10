@@ -150,6 +150,7 @@ def stream_gcode(GRBL_port_path, gcode, home, x, y):
 
             grbl_out = ser.readline()  # Wait for response with carriage return
             ##print(" : ", grbl_out.strip().decode('utf-8'))
+            z = 0
             position = [x, y, z]
 
         ##print('End of gcode')
@@ -174,10 +175,12 @@ if __name__ == "__main__":
                     if right:
                         gcode = f"G01 X50 F500"
                         right = False
+                        x = 50;
                     else:
                         gcode = f"G01 X-50 F500"
                         right = True
-                    stream_gcode(GRBL_port_path, gcode, home, 0, 0)
+                        x = 0
+                    stream_gcode(GRBL_port_path, gcode, home, x, 0)
                     sensor.clear()
                 else:
                     sensor.clear()
