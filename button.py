@@ -130,7 +130,7 @@ def stream_gcode(GRBL_port_path, gcode, home, x, y):
         cleaned_line = remove_eol_chars(remove_comment(gcode))
         if home: #if device is being moved home, run this to reset coordinate system
             ##print(f'G92 X{x} Y{y} Z{z}\n')
-            command = str.encode(f'G92 X{x} Y{y} Z{z}\n')
+            command = str.encode(f'G92 X{x} Y{y}\n')
             ser.write(command)  # Send g-code
 
             wait_for_movement_completion(ser, cleaned_line)
