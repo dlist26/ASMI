@@ -114,6 +114,7 @@ def stream_gcode(GRBL_port_path, gcode, home, x, y):
 
             grbl_out = ser.readline()  # Wait for response with carriage return
             ##print(" : ", grbl_out.strip().decode('utf-8'))
+            z = 0
             position = [x, y, z]
 
         ##print('End of gcode')
@@ -183,7 +184,7 @@ if __name__ == "__main__":
         new_Y = str(new_Y)
         #print(f"G01 X{new_X} Y{new_Y} F{h_speed}")
         gcode = f"G01 X{new_X} Y{new_Y} F{h_speed}"
-        stream_gcode(GRBL_port_path, gcode, home, 0, 0) #moves cnc to x and y coordinates of current well being tested
+        stream_gcode(GRBL_port_path, gcode, home, X, Y) #moves cnc to x and y coordinates of current well being tested
         curr_x = X
         #print(f"curr_X: {curr_x}")
         curr_y = Y
