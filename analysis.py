@@ -115,10 +115,10 @@ def find_E(A): #determine elastic modulus from curve fit
     E_polymer = 1/E_inv
     return E_polymer
 
-def adjust_E(E): #a correction factor based on calibrated data that can be uncommented and adjusted to your own needs
-    factor = 457*pow(E, -0.457)
-    E = E/factor
-    return E
+#def adjust_E(E): #a correction factor based on calibrated data that can be uncommented and adjusted to your own needs
+    #factor = 457*pow(E, -0.457)
+    #E = E/factor
+    #return E
 
 
 
@@ -240,8 +240,8 @@ else:
 
     E = find_E(fit_A) #find elastic modulus
     #print(E)
-    if E < 2000000: #uncomment if you need to adjust calculated value based on calobration data
-        E = adjust_E(E)
+    #if E < 2000000: #uncomment if you need to adjust calculated value based on calobration data
+       #E = adjust_E(E)
     E = round(E)
     ##print(E)
     if round(max(depth_in_range), 2) < 0.4:
