@@ -3,7 +3,7 @@ This is a script which moves the cnc to the location of inputted wells. This is 
 is set up and connected properly
 
 
-Part of this code are adapted from the python_to_GRBL github repository found here:
+Parts of this code are adapted from the python_to_GRBL github repository found here:
 
 https://github.com/Sam-Freitas/python_to_GRBL/tree/main
 Copyright (c) 2016 Florent Gallaire <fgallaire@gmail.com>
