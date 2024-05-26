@@ -36,7 +36,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 This acknowledgement does not constitute an endorsement or promotion
 
 
-Part of this code are also adapted from the python_to_GRBL github repository found here:
+Parts of this code are also adapted from the python_to_GRBL github repository found here:
 
 https://github.com/Sam-Freitas/python_to_GRBL/tree/main
 Copyright (c) 2016 Florent Gallaire <fgallaire@gmail.com>
