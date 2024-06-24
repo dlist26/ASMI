@@ -36,7 +36,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 This acknowledgement does not constitute an endorsement or promotion
 
 
-Parts of this code are also adapted from the python_to_GRBL github repository found here:
+Part of this code are also adapted from the python_to_GRBL github repository found here:
 
 https://github.com/Sam-Freitas/python_to_GRBL/tree/main
 Copyright (c) 2016 Florent Gallaire <fgallaire@gmail.com>
@@ -244,7 +244,6 @@ def stream_gcode(GRBL_port_path, gcode, x, y, well): #moves device based multipl
                 contact = False
                 measurements = []
                 z = round(z-0.02, 2)
-                #Start here!
             else:
                 z = round(z-0.02, 2)
             with open("measurements.csv", 'a') as csvfile: #add data to csv file
@@ -341,9 +340,149 @@ def find_d_and_f_in_range(run_array): #select data within desired depth range to
             depths.append(run_array[i][0])
     return depths, forces
 
-def correct_force(depths, forces): #add correction factor based on simulation data since samples are not ideal shapes
+
+def approximate_height(run_array):
+    depths = []
+    for i in range(0, len(run_array)):
+        depths.append(run_array[i][0])
+    for j in range(0, len(depths)):
+        depths[j] = abs(depths[j])
+    zero = min(depths)
+    num = depths.index(zero)
+    z_pos = (num * 0.02) + 3
+    approx_height = 15 - z_pos
+    #print(approx_height)
+    return approx_height
+
+
+def correct_force(depths, forces, p_ratio, approx_height): #add correction factor based on simulation data since samples are not ideal shapes
     new_array = []
     for i in range(0, len(depths)):
+        if p_ratio < 0.325:
+            if approx_height >= 9.5:
+                b = 0.13
+                c = 1.24
+            elif approx_height >= 8.5 and approx_height < 9.5:
+                b = 0.131
+                c = 1.24
+            elif approx_height >= 7.5 and approx_height < 8.5:
+                b = 0.133
+                c = 1.25
+            elif approx_height >= 6.5 and approx_height < 7.5:
+                b = 0.132
+                c = 1.24
+            elif approx_height >= 5.5 and approx_height < 6.5:
+                b = 0.132
+                c = 1.24
+            elif approx_height >= 4.5 and approx_height < 5.5:
+                b = 0.139
+                c = 1.27
+            elif approx_height >= 3.5 and approx_height < 4.5:
+                b = 0.149
+                c = 1.3
+            else:
+                b = 0.162
+                c = 1.38
+        elif p_ratio >= 0.325 and p_ratio < 0.375:
+            if approx_height >= 9.5:
+                b = 0.132
+                c = 1.25
+            elif approx_height >= 8.5 and approx_height < 9.5:
+                b = 0.132
+                c = 1.25
+            elif approx_height >= 7.5 and approx_height < 8.5:
+                b = 0.134
+                c = 1.25
+            elif approx_height >= 6.5 and approx_height < 7.5:
+                b = 0.136
+                c = 1.26
+            elif approx_height >= 5.5 and approx_height < 6.5:
+                b = 0.126
+                c = 1.25
+            elif approx_height >= 4.5 and approx_height < 5.5:
+                b = 0.133
+                c = 1.27
+            elif approx_height >= 3.5 and approx_height < 4.5:
+                b = 0.144
+                c = 1.32
+            else:
+                b = 0.169
+                c = 1.42
+        elif p_ratio >= 0.375 and p_ratio < 0.425:
+            if approx_height >= 9.5:
+                b = 0.181
+                c = 1.33
+            elif approx_height >= 8.5 and approx_height < 9.5:
+                b = 0.182
+                c = 1.34
+            elif approx_height >= 7.5 and approx_height < 8.5:
+                b = 0.183
+                c = 1.34
+            elif approx_height >= 6.5 and approx_height < 7.5:
+                b = 0.183
+                c = 1.34
+            elif approx_height >= 5.5 and approx_height < 6.5:
+                b = 0.194
+                c = 1.38
+            elif approx_height >= 4.5 and approx_height < 5.5:
+                b = 0.198
+                c = 1.4
+            elif approx_height >= 3.5 and approx_height < 4.5:
+                b = 0.203
+                c = 1.44
+            else:
+                b = 0.176
+                c = 1.46
+        elif p_ratio >= 0.425 and p_ratio < 0.475:
+            if approx_height >= 9.5:
+                b = 0.156
+                c = 1.35
+            elif approx_height >= 8.5 and approx_height < 9.5:
+                b = 0.152
+                c = 1.34
+            elif approx_height >= 7.5 and approx_height < 8.5:
+                b = 0.156
+                c = 1.35
+            elif approx_height >= 6.5 and approx_height < 7.5:
+                b = 0.161
+                c = 1.37
+            elif approx_height >= 5.5 and approx_height < 6.5:
+                b = 0.153
+                c = 1.37
+            elif approx_height >= 4.5 and approx_height < 5.5:
+                b = 0.166
+                c = 1.42
+            elif approx_height >= 3.5 and approx_height < 4.5:
+                b = 0.179
+                c = 1.47
+            else:
+                b = 0.205
+                c = 1.59
+        else:
+            if approx_height >= 9.5:
+                b = 0.203
+                c = 1.58
+            elif approx_height >= 8.5 and approx_height < 9.5:
+                b = 0.207
+                c = 1.6
+            elif approx_height >= 7.5 and approx_height < 8.5:
+                b = 0.212
+                c = 1.62
+            elif approx_height >= 6.5 and approx_height < 7.5:
+                b = 0.217
+                c = 1.65
+            elif approx_height >= 5.5 and approx_height < 6.5:
+                b = 0.21
+                c = 1.64
+            elif approx_height >= 4.5 and approx_height < 5.5:
+                b = 0.22
+                c = 1.68
+            elif approx_height >= 3.5 and approx_height < 4.5:
+                b = 0.17
+                c = 1.58
+            else:
+                b = 0.182
+                c = 1.64
         val = (forces[i])/(1.5364*pow(depths[i], 0.1113))
         new_array.append(val)
     return new_array
@@ -366,10 +505,11 @@ def find_E(A): #determine elastic modulus from curve fit
     E_polymer = 1/E_inv
     return E_polymer
 
-#def adjust_E(E): #a correction factor based on calibrated data that can be uncommented and adjusted to your own needs
-    #factor = 457*pow(E, -0.457)
-    #E = E/factor
-    #return E
+def adjust_E(E): #an empirical correction factor for softer samples which causes issues with getting proper data at small indentation depths
+    if E < 660000:
+        factor = 457 * pow(E, -0.457)
+        E = E / factor
+    return E
 
 
 def go_home(GRBL_port_path): #ensures device starts at its home position, will not work is device is moved externally
@@ -575,6 +715,45 @@ if __name__ == "__main__":
     for well in entry_wells:
         if well not in wells:
             wells.append(well)
+
+    p_ratios = []
+    invalid_answer = True
+    while invalid_answer:
+        same_ratio = input("Do all of the samples have approximately the same Poisson's Ratio?, \"Y\" or \"N\" ")
+        # print(correct)
+        if same_ratio.strip() == 'y' or same_ratio.strip() == 'Y':
+            get_ratio = True
+            while get_ratio:
+                p_ratio = input(
+                    "What is the approximate Poisson's Ratio of the samples? Value should be between 0.3-0.5. ")
+                cleaned_input = p_ratio.replace(".", "1")
+                if cleaned_input.isnumeric() and float(p_ratio) >= 0.3 and float(p_ratio) <= 0.5:
+                    p_ratio = float(p_ratio)
+                    for i in range(0, len(wells)):
+                        p_ratios.append(p_ratio)
+                    get_ratio = False
+                else:
+                    print("Improper Poisson's Ratio, please try again.")
+            invalid_answer = False
+        elif same_ratio.strip() == "n" or same_ratio.strip() == "N":
+            print("Okay, for each well, please input the approximate Poisson's Ratio")
+            for well in wells:
+                print(f"What is the approximate Poisson's Ratio of well {well}? ")
+                get_ratio = True
+                while get_ratio:
+                    p_ratio = input(
+                        "What is the approximate Poisson's Ratio of the sample? Value should be between 0.3-0.5. ")
+                    cleaned_input = p_ratio.replace(".", "1")
+                    if cleaned_input.isnumeric() and float(p_ratio) >= 0.3 and float(p_ratio) <= 0.5:
+                        p_ratio = float(p_ratio)
+                        p_ratios.append(p_ratio)
+                        get_ratio = False
+                    else:
+                        print("Improper Poisson's Ratio, please try again.")
+            invalid_answer = False
+        else:
+            print("Invalid response, please try again")
+
     print(f"Okay, testing wells: {wells}")
 
     #Test machine homing
@@ -634,6 +813,7 @@ if __name__ == "__main__":
         if run_array != []:
             well_data = run_array
             # print(run_array)
+            height = approximate_height(run_array)
             depths, forces = split(run_array)
             # pyplot.scatter(depths, forces)
             # pyplot.show()
@@ -641,10 +821,11 @@ if __name__ == "__main__":
             # print(forces)
             well_depths = depths
             well_forces = forces
-            depth_in_range, force_in_range = find_d_and_f_in_range(run_array) #find desired depths and forces at those depths
+            depth_in_range, force_in_range = find_d_and_f_in_range(run_array)
             # print(depth_in_range)
             # print(force_in_range)
-            adjusted_forces = correct_force(depth_in_range, force_in_range) #correct force based on non ideal shape
+            p_ratio = p_ratios[n]
+            adjusted_forces = correct_force(depth_in_range, force_in_range, p_ratio, height)
             # print(adjusted_forces)
             depth_in_range = np.asarray(depth_in_range)
             adjusted_forces = np.asarray(adjusted_forces)
@@ -687,10 +868,11 @@ if __name__ == "__main__":
                 while continue_to_adjust:
                     count = count + 1
                     old_d0 = fit_d0
-                    run_array = adjust_depth(run_array, fit_d0) #adjust depths by curve fit offset
-                    depth_in_range, force_in_range = find_d_and_f_in_range(run_array) #find new forces and depth in the desired range
+                    run_array = adjust_depth(run_array, fit_d0)
+                    depth_in_range, force_in_range = find_d_and_f_in_range(run_array)
                     # print(depth_in_range)
-                    adjusted_forces = correct_force(depth_in_range, force_in_range) #adjust original force values in range by updated depths
+                    height = approximate_height(run_array)
+                    adjusted_forces = correct_force(depth_in_range, force_in_range, p_ratio, height)
                     # print(adjusted_forces)
                     depth_in_range = np.asarray(depth_in_range)
                     adjusted_forces = np.asarray(adjusted_forces)
@@ -728,16 +910,15 @@ if __name__ == "__main__":
                             if abs(round(fit_d0, 1)) == round(min_d0, 1):
                                 break
                         elif count == 300:
-                            print("Error in data analysis")
-                            error = True
+                            print("Possible error in data analysis")
+                            print(f"Optimal offset depth was {fit_d0}, normally it is < 0.01")
                             break
 
             if not error:
                 E = find_E(fit_A) #find elastic modulus
                 #print(E)
-                #if E < 2000000: #uncomment if you need to adjust calculated value based on calobration data
-                    #E = adjust_E(E)
-                ##print(E)
+                E = adjust_E(E) #adjustemnt based on empirical data for softer samples which may cause difficultly in making initial measurements
+                #print(E)
                 E = round(E)
                 if round(max(depth_in_range), 2) < 0.4:
                     print("Sample was not indented far enough")
@@ -745,7 +926,7 @@ if __name__ == "__main__":
                 err = np.sqrt(np.diag(covariance))
                 # print(covariance[0][0])
                 std_dev = round(find_E(err[0]))
-                ##(std_dev)
+                #(std_dev)
                 row = [wells[n], E, std_dev]
                 results.append(row)
                 print(f"Well {wells[n]}: E = {E} N/m^2, Uncertainty = {std_dev} N/m^2")
