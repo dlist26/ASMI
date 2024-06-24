@@ -1,11 +1,3 @@
-"""
-This is a script to analyze one specific well from the last time either the measure or custom_measure scripts
-were used.
-
-"""
-
-
-
 import csv
 import sys
 import time
@@ -16,7 +8,7 @@ from scipy.optimize import curve_fit
 
 
 
-def load_csv(): #load data from csv file containing data from only the most recent round of testing
+def load_csv(): #load data from csv file
    with open('measurements.csv', 'r') as file:
        reader = csv.reader(file)
        data = list(reader)
@@ -32,7 +24,7 @@ def collect_run_data(data, well): #collect data for specific run from csv file
     no_contact = []
     run_array = []
     forces = []
-    for i in range(0, len(data)): #first, gather the data from only the specified well
+    for i in range(0, len(data)):
         if data[i][0] == well:
             values = [data[i][1], data[i][2]]
             well_data.append(values)
@@ -41,7 +33,7 @@ def collect_run_data(data, well): #collect data for specific run from csv file
     if len(well_data) == 0:
         print("Well was not tested")
         sys.exit()
-    for l in range(1, len(well_data)): #determine at what z-height first contact was made
+    for l in range(1, len(well_data)):
         if float(well_data[l][1]) <= -1*float(well_data[0][0]) + 2*float(well_data[0][1]):
             no_contact.append(l)
         run_array.append([well_data[l][0], well_data[l][1]])
@@ -49,7 +41,7 @@ def collect_run_data(data, well): #collect data for specific run from csv file
     #print("\n")
     #print(no_contact)
     #print("\n")
-    if len(run_array) - int(no_contact[len(no_contact) - 1]) <= 10: #do not analyze if not enough measurements were made
+    if len(run_array) - int(no_contact[len(no_contact) - 1]) <= 10:
         print("Either well was not tested or no data was collected, either because sample was too short or too soft")
         run_array = []
         sys.exit()
@@ -60,19 +52,39 @@ def collect_run_data(data, well): #collect data for specific run from csv file
     #print(start_val)
     #print(len(well_data))
     #print(run_array[start_val][0])
-    for k in range(0, len(run_array)): #adjust forces by average "zeroed" force and adjust z heights to represent indentation depth
+    for k in range(0, len(run_array)):
         run_array[k][0] = round(-1*(float(run_array[k][0]) - float(well_data[start_val][0])), 2)
         run_array[k][1] = float(run_array[k][1]) + float(well_data[0][0])
         forces.append(run_array[k][1])
-    if forces == [] or max(forces)-min(forces) < 0.04: #do not analyze if sample is too soft
+    if forces == [] or max(forces)-min(forces) < 0.04:
         print("Either well was not tested or no data was collected, either because sample was too short or too soft")
         run_array = []
         sys.exit()
-    #print(run_array)
-    #print("\n")
-    return run_array
+    get_ratio = True
+    while get_ratio:
+        p_ratio = input("What is the approximate Poisson's Ratio of the sample? Value should be between 0.3-0.5. ")
+        cleaned_input = p_ratio.replace(".", "1")
+        if cleaned_input.isnumeric() and float(p_ratio) >= 0.3 and float(p_ratio) <= 0.5:
+            p_ratio = float(p_ratio)
+            get_ratio = False
+        else:
+            print("Improper Poisson's Ratio, please try again.")
+    return run_array, p_ratio
 
-def split(run_array): #get force and depth data in separate arrays to adjust individually
+def approximate_height(run_array):
+    depths = []
+    for i in range(0, len(run_array)):
+        depths.append(run_array[i][0])
+    for j in range(0, len(depths)):
+        depths[j] = abs(depths[j])
+    zero = min(depths)
+    num = depths.index(zero)
+    z_pos = (num * 0.02) + 3
+    approx_height = 15 - z_pos
+    #print(approx_height)
+    return approx_height
+
+def split(run_array):
     depths = []
     forces = []
     for i in range(0, len(run_array)):
@@ -90,10 +102,135 @@ def find_d_and_f_in_range(run_array): #select data within desired depth range to
             #print(i)
     return depths, forces
 
-def correct_force(depths, forces): #add correction factor based on simulation data since samples are not ideal shapes
+def correct_force(depths, forces, p_ratio, approx_height): #add correction factor based on simulation data since samples are not ideal shapes
     new_array = []
     for i in range(0, len(depths)):
-        val = (forces[i])/(1.5364*pow(depths[i], 0.1113))
+        if p_ratio < 0.325:
+            if approx_height >= 9.5:
+                b = 0.13
+                c = 1.24
+            elif approx_height >= 8.5 and approx_height < 9.5:
+                b = 0.131
+                c = 1.24
+            elif approx_height >= 7.5 and approx_height < 8.5:
+                b = 0.133
+                c = 1.25
+            elif approx_height >= 6.5 and approx_height < 7.5:
+                b = 0.132
+                c = 1.24
+            elif approx_height >= 5.5 and approx_height < 6.5:
+                b = 0.132
+                c = 1.24
+            elif approx_height >= 4.5 and approx_height < 5.5:
+                b = 0.139
+                c = 1.27
+            elif approx_height >= 3.5 and approx_height < 4.5:
+                b = 0.149
+                c = 1.3
+            else:
+                b = 0.162
+                c = 1.38
+        elif p_ratio >= 0.325 and p_ratio < 0.375:
+            if approx_height >= 9.5:
+                b = 0.132
+                c = 1.25
+            elif approx_height >= 8.5 and approx_height < 9.5:
+                b = 0.132
+                c = 1.25
+            elif approx_height >= 7.5 and approx_height < 8.5:
+                b = 0.134
+                c = 1.25
+            elif approx_height >= 6.5 and approx_height < 7.5:
+                b = 0.136
+                c = 1.26
+            elif approx_height >= 5.5 and approx_height < 6.5:
+                b = 0.126
+                c = 1.25
+            elif approx_height >= 4.5 and approx_height < 5.5:
+                b = 0.133
+                c = 1.27
+            elif approx_height >= 3.5 and approx_height < 4.5:
+                b = 0.144
+                c = 1.32
+            else:
+                b = 0.169
+                c = 1.42
+        elif p_ratio >= 0.375 and p_ratio < 0.425:
+            if approx_height >= 9.5:
+                b = 0.181
+                c = 1.33
+            elif approx_height >= 8.5 and approx_height < 9.5:
+                b = 0.182
+                c = 1.34
+            elif approx_height >= 7.5 and approx_height < 8.5:
+                b = 0.183
+                c = 1.34
+            elif approx_height >= 6.5 and approx_height < 7.5:
+                b = 0.183
+                c = 1.34
+            elif approx_height >= 5.5 and approx_height < 6.5:
+                b = 0.194
+                c = 1.38
+            elif approx_height >= 4.5 and approx_height < 5.5:
+                b = 0.198
+                c = 1.4
+            elif approx_height >= 3.5 and approx_height < 4.5:
+                b = 0.203
+                c = 1.44
+            else:
+                b = 0.176
+                c = 1.46
+        elif p_ratio >= 0.425 and p_ratio < 0.475:
+            if approx_height >= 9.5:
+                b = 0.156
+                c = 1.35
+            elif approx_height >= 8.5 and approx_height < 9.5:
+                b = 0.152
+                c = 1.34
+            elif approx_height >= 7.5 and approx_height < 8.5:
+                b = 0.156
+                c = 1.35
+            elif approx_height >= 6.5 and approx_height < 7.5:
+                b = 0.161
+                c = 1.37
+            elif approx_height >= 5.5 and approx_height < 6.5:
+                b = 0.153
+                c = 1.37
+            elif approx_height >= 4.5 and approx_height < 5.5:
+                b = 0.166
+                c = 1.42
+            elif approx_height >= 3.5 and approx_height < 4.5:
+                b = 0.179
+                c = 1.47
+            else:
+                b = 0.205
+                c = 1.59
+        else:
+            if approx_height >= 9.5:
+                b = 0.203
+                c = 1.58
+            elif approx_height >= 8.5 and approx_height < 9.5:
+                b = 0.207
+                c = 1.6
+            elif approx_height >= 7.5 and approx_height < 8.5:
+                b = 0.212
+                c = 1.62
+            elif approx_height >= 6.5 and approx_height < 7.5:
+                b = 0.217
+                c = 1.65
+            elif approx_height >= 5.5 and approx_height < 6.5:
+                b = 0.21
+                c = 1.64
+            elif approx_height >= 4.5 and approx_height < 5.5:
+                b = 0.22
+                c = 1.68
+            elif approx_height >= 3.5 and approx_height < 4.5:
+                b = 0.17
+                c = 1.58
+            else:
+                b = 0.182
+                c = 1.64
+        val = (forces[i])/(c*pow(depths[i], b))
         new_array.append(val)
     return new_array
 
@@ -115,10 +252,11 @@ def find_E(A): #determine elastic modulus from curve fit
     E_polymer = 1/E_inv
     return E_polymer
 
-#def adjust_E(E): #a correction factor based on calibrated data that can be uncommented and adjusted to your own needs
-    #factor = 457*pow(E, -0.457)
-    #E = E/factor
-    #return E
+def adjust_E(E):
+    if E < 660000:
+        factor = 457 * pow(E, -0.457)
+        E = E/factor
+    return E
 
 
 
@@ -133,20 +271,21 @@ while invalid: #obtain wells to be tested
        print("Error, please try again")
    else:
        invalid = False
-run_array = collect_run_data(data, well) #get data for specified well
+run_array, p_ratio = collect_run_data(data, well)
 well_data = run_array
 #print(run_array)
 depths, forces = split(run_array)
+height = approximate_height(run_array)
 #pyplot.scatter(depths, forces)
 #pyplot.show()
 #print(depths)
 #print(forces)
 well_depths = depths
 well_forces = forces
-depth_in_range, force_in_range = find_d_and_f_in_range(run_array) #find desired depths and forces at those depths
+depth_in_range, force_in_range = find_d_and_f_in_range(run_array)
 #print(depth_in_range)
 #print(force_in_range)
-adjusted_forces = correct_force(depth_in_range, force_in_range) #correct force based on non ideal shape
+adjusted_forces = correct_force(depth_in_range, force_in_range, p_ratio, height)
 #print(adjusted_forces)
 depth_in_range = np.asarray(depth_in_range)
 adjusted_forces = np.asarray(adjusted_forces)
@@ -158,7 +297,7 @@ def Hertz_func(depth, A, d0):
 
 
 
-try: #fit data to a Hertzian contact mechanics function
+try:
     parameters, covariance = curve_fit(Hertz_func, depth_in_range, adjusted_forces, p0=[2, 0.03])
 except:
     print("Data could not be analyzed")
@@ -184,21 +323,22 @@ else:
     #pyplot.show()
 
     count = 0
-    continue_to_adjust = True #if improper starting depth was determined using only force data, adjust based on curve fit
+    continue_to_adjust = True
     if abs(fit_d0) < 0.01:
         continue_to_adjust = False
     min_d0 = 100
     while continue_to_adjust:
         count = count + 1
         old_d0 = fit_d0
-        run_array = adjust_depth(run_array, fit_d0) #adjust depths by curve fit offset
-        depth_in_range, force_in_range = find_d_and_f_in_range(run_array) #find new forces and depth in the desired range
+        run_array = adjust_depth(run_array, fit_d0)
+        height = approximate_height(run_array)
+        depth_in_range, force_in_range = find_d_and_f_in_range(run_array)
         #print(depth_in_range)
-        adjusted_forces = correct_force(depth_in_range, force_in_range) #adjust original force values in range by updated depths
+        adjusted_forces = correct_force(depth_in_range, force_in_range, p_ratio, height)
         #print(adjusted_forces)
         depth_in_range = np.asarray(depth_in_range)
         adjusted_forces = np.asarray(adjusted_forces)
-        try: #refit to curve
+        try:
             parameters, covariance = curve_fit(Hertz_func, depth_in_range, adjusted_forces, p0=[2, 0.03])
         except:
             print("Data could not be analyzed")
@@ -220,28 +360,24 @@ else:
             #pyplot.ylabel("Force (N)")
             #pyplot.title("Force vs. Indentation Depth")
             #pyplot.show()
-            if abs(round(old_d0, 5)) == abs(round(fit_d0, 5)): #sometimes curve fit converges to improper value, nudges it away from convergence
+            if abs(round(old_d0, 5)) == abs(round(fit_d0, 5)):
                 fit_d0 = -0.75 * fit_d0
             elif abs(fit_d0) < 0.01:
                 continue_to_adjust = False
                 break
-            elif count > 100 and count < 200: #if optimal value is greater than 0.01, find the lowest obtained optimal value
+            elif count > 100 and count < 200:
                 if abs(round(fit_d0, 2)) == round(min_d0, 2):
                     break
             elif count >= 200 and count < 300:
                 if abs(round(fit_d0, 1)) == round(min_d0, 1):
                     break
             elif count == 300:
-                fit_d0 = min_d0
-                print("Possible error in data analysis")
-                print(f"Optimal offset depth was {fit_d0}, normally it is < 0.01")
-                print("if data is plotted, curve fit will likely not match data, but it is based on data that was used from a previous adjustment")
+                print("Fit quality may be poor")
                 break
 
-    E = find_E(fit_A) #find elastic modulus
+    E = find_E(fit_A)
     #print(E)
-    #if E < 2000000: #uncomment if you need to adjust calculated value based on calobration data
-       #E = adjust_E(E)
+    E = adjust_E(E)
     E = round(E)
     ##print(E)
     if round(max(depth_in_range), 2) < 0.4:
@@ -260,5 +396,5 @@ else:
     pyplot.plot(depth_in_range, y_var)
     pyplot.xlabel("Depth (mm)")
     pyplot.ylabel("Force (N)")
-    pyplot.title(f"Force vs. Indentation Depth")# of Well {well}")
+    pyplot.title(f"Force vs. Indentation Depth of Well {well}")
     pyplot.show()
