@@ -489,11 +489,11 @@ def adjust_depth(run_array, d0): #using curve fit, adjust depth so that at zero 
     return run_array
 
 
-def find_E(A): #determine elastic modulus from curve fit
+def find_E(A, p_ratio): #determine elastic modulus from curve fit
     r_sphere = 0.0025
     sphere_p_ratio = 0.28
     sphere_E = 1.8 * pow(10, 11)
-    polymer_p_ratio = 0.5
+    polymer_p_ratio = p_ratio
     actual_A = A * pow(1000, 1.5)
     E_star = (actual_A * 0.75)/pow(r_sphere, 0.5)
     E_inv = 1/(E_star * (1 - pow(polymer_p_ratio, 2))) - (1 - pow(sphere_p_ratio, 2))/(sphere_E * (1 - pow(polymer_p_ratio, 2)))
@@ -1041,7 +1041,7 @@ if __name__ == "__main__":
                             break
 
             if not error:
-                E = find_E(fit_A) #find elastic modulus
+                E = find_E(fit_A, p_ratio) #find elastic modulus
                 #print(E)
                 E = adjust_E(E) #adjustemnt based on empirical data for softer samples which may cause difficultly in making initial measurements
                 ##print(E)
@@ -1051,7 +1051,7 @@ if __name__ == "__main__":
                     print(f"The range the measurement was made with was {round(min(depth_in_range), 2)} mm to {round(max(depth_in_range), 2)} mm")
                 err = np.sqrt(np.diag(covariance))
                 # print(covariance[0][0])
-                std_dev = round(find_E(err[0]))
+                std_dev = round(find_E(err[0], p_ratio))
                 #print(std_dev)
                 row = [wells[n], E, std_dev]
                 results.append(row)
