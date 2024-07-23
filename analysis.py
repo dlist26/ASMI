@@ -4,12 +4,28 @@ import time
 import numpy as np
 import matplotlib.pyplot as pyplot
 from scipy.optimize import curve_fit
+import os
 
 
 
 
 def load_csv(): #load data from csv file
-   with open('measurements.csv', 'r') as file:
+   bad_name = True
+   files = os.listdir("C://Users//dlist//OneDrive//Desktop//Classes//Research//CNC_Programming//Python_G-Code")
+   while bad_name:
+        filename = input(
+            "Please enter the name of the the file you would like to analyze the data from. The name is case"
+            " sensitive, so please enter the name in exactly. To see a list of all files, press Ctrl + C and"
+            " type ls in the command window, then rerun this program. Note, please do not type in the .csv, just enter "
+            "the name of the file. ")
+        filename = filename + ".csv"
+        if filename in files:
+            print("File was found")
+            bad_name = False
+        else:
+            print("File was not found, please try again")
+   print(filename)
+   with open(filename, 'r') as file:
        reader = csv.reader(file)
        data = list(reader)
    cleaned_data = []
