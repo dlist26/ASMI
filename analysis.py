@@ -7,11 +7,10 @@ from scipy.optimize import curve_fit
 import os
 
 
-
+files = os.listdir("/home/robot/ASMI_KABlab") #change to correct directory for your device!!!
 
 def load_csv(): #load data from csv file
    bad_name = True
-   files = os.listdir("C://Users//dlist//OneDrive//Desktop//Classes//Research//CNC_Programming//Python_G-Code")
    while bad_name:
         filename = input(
             "Please enter the name of the the file you would like to analyze the data from. The name is case"
