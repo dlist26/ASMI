@@ -72,6 +72,7 @@ import csv
 import logging
 import numpy as np
 import math
+import os
 
 import matplotlib.pyplot as pyplot
 from scipy.optimize import curve_fit
@@ -165,7 +166,7 @@ def move_gcode(GRBL_port_path, gcode, home, x, y, z):
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(position)
 
-def get_start_stats(well): #take measurements with no contact above each well so force measurements can be zeroed
+def get_start_stats(well, filename): #take measurements with no contact above each well so force measurements can be zeroed
     measurements = []
     device.start()
     sensors = device.get_enabled_sensors()
@@ -183,7 +184,7 @@ def get_start_stats(well): #take measurements with no contact above each well so
     standard_dev = statistics.stdev(measurements)
     ##print(f"avg = {average}")
     ##print(f"stdev = {standard_dev}")
-    with open("measurements.csv", 'a') as csvfile: #first entry for each well is average non-contact force
+    with open(filename, 'a') as csvfile: #first entry for each well is average non-contact force
         csvwriter = csv.writer(csvfile)
         row = [well, str(average), str(standard_dev)]
         csvwriter.writerow(row)
@@ -205,11 +206,11 @@ def get_measurement(): #takes 1 measuremnt
     return val
 
 
-def stream_gcode(GRBL_port_path, gcode, x, y, well): #moves device based multiple lines of g-code to indent well
+def stream_gcode(GRBL_port_path, gcode, x, y, well, filename): #moves device based multiple lines of g-code to indent well
     stiff = False
     with serial.Serial(GRBL_port_path, BAUD_RATE) as ser:
         send_wake_up(ser)
-        avg, stdev = get_start_stats(well) #get non contact measurements for the current well
+        avg, stdev = get_start_stats(well, filename) #get non contact measurements for the current well
         down = True
         up = False
         z = -1*height_offset+1 #sets starting z-height of indenter
@@ -241,7 +242,7 @@ def stream_gcode(GRBL_port_path, gcode, x, y, well): #moves device based multipl
                 z = round(z-0.02, 2)
             else:
                 z = round(z-0.02, 2)
-            with open("measurements.csv", 'a') as csvfile: #add data to csv file
+            with open(filename, 'a') as csvfile: #add data to csv file
                 csvwriter = csv.writer(csvfile)
                 row = [str(well), str(z), str(value * -1)]
                 csvwriter.writerow(row)
@@ -263,8 +264,8 @@ def stream_gcode(GRBL_port_path, gcode, x, y, well): #moves device based multipl
 
         return measurements, z
 
-def load_csv(): #load data from csv file
-   with open('measurements.csv', 'r') as file:
+def load_csv(filename): #load data from csv file
+   with open(filename, 'r') as file:
        reader = csv.reader(file)
        data = list(reader)
    cleaned_data = []
@@ -629,6 +630,55 @@ if __name__ == "__main__":
     x_offset = -100  # set distance between wells
     y_offset = -100
 
+    bad_name = True
+    files = os.listdir("C://Users//dlist//OneDrive//Desktop//Classes//Research//CNC_Programming//Python_G-Code")
+    while bad_name:
+        filename = input(
+            "Please enter the name of the the file you would like to save the data to. The format should have"
+            " no spaces like the following: File_name ")
+        count = 0
+        for i in range(0, len(filename)):
+            if filename[i] == " ":
+                count = count + 1
+        if count > 0:
+            print("Improper filename, file contained a space, please try again")
+            retry = True
+        else:
+            retry = False
+        if not retry:
+            results_filename = filename + "_results.csv"
+            filename = filename + ".csv"
+            if filename in files:
+                bad_answer = True
+                while bad_answer:
+                    overwrite = input("A file with that name already exists, would you like to overwrite it? Y or N: ")
+                    if overwrite.strip() == 'y' or overwrite.strip() == 'Y':
+                        bad_answer = False
+                        bad_name = False
+                        print("Okay, overwriting file")
+                    elif overwrite.strip() == "n" or overwrite.strip() == "N":
+                        bad_answer = False
+                        print("Okay, restarting file naming process")
+                    else:
+                        print("Invalid response, please try again")
+            else:
+                bad_name = False
+    # print(filename)
+    # print(files)
+
+    enter_num_wells = True
+    while enter_num_wells:
+        num_wells_x = input(
+            "How many wells are there in the x direction (horizontal if viewing the system from above: ")
+        num_wells_y = input("How many wells are there in the y direction (vertical if viewing the system from above: ")
+        if num_wells_x.isnumeric() and num_wells_y.isnumeric():
+            enter_num_wells = False
+        else:
+            print("Improper value entered, please enter in an integer number for both values")
+
+    num_wells_x = num_wells_x - 1
+    num_wells_y = num_wells_y - 1
+
     set_coordinates = True
     while set_coordinates: #initiates coordinate setting process
         if x_init == -100:
@@ -707,7 +757,7 @@ if __name__ == "__main__":
                         while invalid:
                             positioned = input("Is the sensor centered above well H1? (Y or N): ")
                             if positioned == 'Y' or positioned == 'y':
-                                x_offset = round((x_custom - x_init)/7, 2)
+                                x_offset = round((x_custom - x_init)/num_wells_x, 2)
                                 print("Okay, setting offsets in x direction")
                                 #print(x_offset)
                                 invalid = False
@@ -720,7 +770,7 @@ if __name__ == "__main__":
                         while invalid:
                             positioned = input("Is the sensor centered above well H12? (Y or N): ")
                             if positioned == 'Y' or positioned == 'y':
-                                y_offset = round((y_custom - y_init)/11, 2)
+                                y_offset = round((y_custom - y_init)/num_wells_y, 2)
                                 print("Okay, setting offsets in y direction")
                                 #print(y_offset)
                                 invalid = False
@@ -921,7 +971,7 @@ if __name__ == "__main__":
         while z >= lowest+1: #creates lines of gcode to indent sample
             gcode.append(f"G01 Z{z} F{v_speed}")
             z = round(z-0.02, 2)
-        measurements, z, stiff = stream_gcode(GRBL_port_path, gcode, X, Y, well)
+        measurements, z, stiff = stream_gcode(GRBL_port_path, gcode, X, Y, well, filename)
         gcode = f"G01 Z{-z+Z} F{v_speed}"
         move_gcode(GRBL_port_path, gcode, home, X, Y, Z) #moves indenter back up to original z height
         curr_x = X
@@ -930,7 +980,7 @@ if __name__ == "__main__":
         #print(f"curr_Y: {curr_y}")
         #Save measurements to csv, probably do in function so depth values can be added
         #Analysis
-        data = load_csv() #analyzes data from last well that was tested
+        data = load_csv(filename) #analyzes data from last well that was tested
         # print(data)
         cols = ["A", "B", "C", "D", "E", "F", "G", "H"]
         rows = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]
@@ -1056,12 +1106,21 @@ if __name__ == "__main__":
                 row = [wells[n], E, std_dev]
                 results.append(row)
                 print(f"Well {wells[n]}: E = {E} N/m^2, Uncertainty = {std_dev} N/m^2")
+                with open(results_filename, 'a') as csvfile:
+                    csvwriter = csv.writer(csvfile)
+                    csvwriter.writerow(row)
             else:
                 row = [wells[n], "no data", "no data"]
                 results.append(row)
+                with open(results_filename, 'a') as csvfile:
+                    csvwriter = csv.writer(csvfile)
+                    csvwriter.writerow(row)
         else:
             row = [wells[n], "no data", "no data"]
             results.append(row)
+            with open(results_filename, 'a') as csvfile:
+                csvwriter = csv.writer(csvfile)
+                csvwriter.writerow(row)
 
 
     home = True #move machine home
