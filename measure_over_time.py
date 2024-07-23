@@ -27,6 +27,7 @@ godirect = GoDirect(use_ble=True, use_usb=True)
 device = godirect.get_device(threshold=-100)
 lowest = -11
 height_offset = 4
+files = os.listdir("/home/robot/ASMI_KABlab") #change to correct directory for your device!!!
 
 def remove_comment(string):
     if (string.find(';') == -1):
@@ -591,7 +592,6 @@ if __name__ == "__main__":
     time_between = round(time_between * 60)
 
     bad_name = True
-    files = os.listdir("C://Users//dlist//OneDrive//Desktop//Classes//Research//CNC_Programming//Python_G-Code")
     while bad_name:
         filename = input(
             "Please enter the name of the the file you would like to save the data to. The format should have"
