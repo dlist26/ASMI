@@ -1,67 +1,3 @@
-"""
-This is a script which can be used to make measurements if samples are in standard 96 well SBS microplate. This is the
-main measurement taking script.
-
-
-Parts of this code are adapted from the godirect-examples github repository found here:
-
-https://github.com/VernierST/godirect-examples/tree/main
-Copyright (c) 2018, Vernier Software and Technology, @VernierST
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice,
-this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice,
-this list of conditions and the following disclaimer in the documentation
-and/or other materials provided with the distribution.
-
-3. Neither the name of the copyright holder nor the names of its contributors
-may be used to endorse or promote products derived from this software without
-specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-This acknowledgement does not constitute an endorsement or promotion
-
-
-Part of this code are also adapted from the python_to_GRBL github repository found here:
-
-https://github.com/Sam-Freitas/python_to_GRBL/tree/main
-Copyright (c) 2016 Florent Gallaire <fgallaire@gmail.com>
-Copyright (c) 2014 Gabriele Cirulli
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-
-"""
-
 import serial
 import time
 from threading import Event
@@ -72,6 +8,8 @@ import logging
 import numpy as np
 import math
 import warnings
+import os
+from datetime import datetime
 
 import matplotlib.pyplot as pyplot
 
@@ -80,10 +18,10 @@ from scipy.optimize import curve_fit
 logging.basicConfig()
 
 BAUD_RATE = 115200
-GRBL_port_path = "/dev/ttyUSB0" #Change this to the desired serial port!
-x_init = 17.4  # set x position of well A1, change to fit to your device!
-y_init = 51.1  # set y position of well A1, change to fit to your device!
-offset = 8.95  # set distance between wells, change to fit to your device!
+GRBL_port_path = "/dev/ttyUSB0" #"/dev/ttyUSB0"
+x_init = 17.4  # set position of well A1
+y_init = 51.1  # set position of well A1
+offset = 8.95  # set distance between wells
 
 godirect = GoDirect(use_ble=True, use_usb=True)
 device = godirect.get_device(threshold=-100)
@@ -104,13 +42,13 @@ def remove_eol_chars(string):
 
 def send_wake_up(ser):
     # Wake up
-    # Hit enter a few times to wake the cnc
+    # Hit enter a few times to wake the Printrbot
     ser.write(str.encode("\r\n\r\n"))
-    time.sleep(2)  # Wait for cnc to initialize
+    time.sleep(2)  # Wait for Printrbot to initialize
     ser.flushInput()  # Flush startup text in serial input
 
 
-def wait_for_movement_completion(ser, cleaned_line): #wait for cnc to reach destination before sending new movement
+def wait_for_movement_completion(ser, cleaned_line):
     Event().wait(1)
 
     if cleaned_line != '$X' or '$$':
@@ -138,10 +76,11 @@ def wait_for_movement_completion(ser, cleaned_line): #wait for cnc to reach dest
 
 
 def move_gcode(GRBL_port_path, gcode, home, x, y, z):
+    # with contect opens file/connection and closes it if function(with) scope is left
     with serial.Serial(GRBL_port_path, BAUD_RATE) as ser:
         send_wake_up(ser)
         cleaned_line = remove_eol_chars(remove_comment(gcode))
-        if home: #if device is being moved home, run this to reset coordinate system
+        if home:
             ##print(f'G92 X{x} Y{y} Z{z}\n')
             command = str.encode(f'G92 X{x} Y{y} Z{z}\n')
             ser.write(command)  # Send g-code
@@ -166,11 +105,11 @@ def move_gcode(GRBL_port_path, gcode, home, x, y, z):
             position = [x, y, z]
 
         ##print('End of gcode')
-        with open("position.csv", 'w') as csvfile: #update position of cnc
+        with open("position.csv", 'w') as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(position)
 
-def get_start_stats(well): #take measurements with no contact above each well so force measurements can be zeroed
+def get_start_stats(well, filename, trial):
     measurements = []
     device.start()
     sensors = device.get_enabled_sensors()
@@ -188,13 +127,13 @@ def get_start_stats(well): #take measurements with no contact above each well so
     standard_dev = statistics.stdev(measurements)
     ##print(f"avg = {average}")
     ##print(f"stdev = {standard_dev}")
-    with open("measurements.csv", 'a') as csvfile: #first entry for each well is average non-contact force
+    with open(filename, 'a') as csvfile:
         csvwriter = csv.writer(csvfile)
-        row = [well, str(average), str(standard_dev)]
+        row = [well, str(average), str(standard_dev), trial]
         csvwriter.writerow(row)
     return average, standard_dev
 
-def get_measurement(): #takes 1 measuremnt
+def get_measurement():
     device.start()
     val = 0
     sensors = device.get_enabled_sensors()
@@ -210,48 +149,50 @@ def get_measurement(): #takes 1 measuremnt
     return val
 
 
-def stream_gcode(GRBL_port_path, gcode, x, y, well): #moves device based multiple lines of g-code to indent well
+def stream_gcode(GRBL_port_path, gcode, x, y, well, filename, trial):
+    # with contect opens file/connection and closes it if function(with) scope is left
     stiff = False
     with serial.Serial(GRBL_port_path, BAUD_RATE) as ser:
         send_wake_up(ser)
-        avg, stdev = get_start_stats(well) #get non contact measurements for the current well
+        avg, stdev = get_start_stats(well, filename, trial)
         down = True
         up = False
-        z = -1*height_offset+1 #sets starting z-height of indenter
-        z_max = lowest - 2 #sets the maximum z-height the indenter will go
+        z = -1*height_offset+1
+        z_max = lowest - 2
         contact = False
         measurements = []
-        for line in gcode: #for each line of gcode:
+        for line in gcode:
             ##print(z)
-            value = get_measurement() #take a measurement
-            if value < avg - 2 * stdev: #determine if contact was made based on non-contact measurements
+            value = get_measurement()
+            if value < avg - 2 * stdev:
                 ##print("contact")
                 ##print(z_max)
-                measurements.append(value * -1) #multipy by -1 since pushing sensor is defined as a negative force
-                if z == z_max or value <= -20: #exit condition if sample was indented far enough or force is too high that it might damage the indenter or sensor
+                measurements.append(value * -1)
+                if z == z_max or value <= -20:
                     if value <= -20:
                         print("Sample too stiff to analyze")
                         stiff = True
                     return measurements, z, stiff
-                if len(measurements) == 1: #sets lowest z-height indenter needs to go to if contact was made
+                if len(measurements) == 1:
                     ##print("creating z_max")
                     z_max = round(z - 1, 2)
                 contact = True
                 z = round(z-0.02, 2)
-            elif contact == True and value >= avg - 2 * stdev: #if contact was determined bu not sustained due to random fluctuations
+            elif contact == True and value >= avg - 2 * stdev:
                 ##print("False alarm")
-                z_max = lowest - 2 #reset lowest z height
+                z_max = lowest - 2
                 contact = False
                 measurements = []
                 z = round(z-0.02, 2)
+                #Start here!
             else:
                 z = round(z-0.02, 2)
-            with open("measurements.csv", 'a') as csvfile: #add data to csv file
+            with open(filename, 'a') as csvfile:
                 csvwriter = csv.writer(csvfile)
-                row = [str(well), str(z), str(value * -1)]
+                row = [str(well), str(z), str(value * -1), trial]
                 csvwriter.writerow(row)
             cleaned_line = remove_eol_chars(remove_comment(line))
-            if cleaned_line:  # checks if string is empty, moves cnc
+            if cleaned_line:  # checks if string is empty
                 ##print("Sending gcode:" + str(cleaned_line))
                 # converts string to byte encoded string and append newline
                 command = str.encode(line + '\n')
@@ -262,14 +203,14 @@ def stream_gcode(GRBL_port_path, gcode, x, y, well): #moves device based multipl
                 grbl_out = ser.readline()  # Wait for response with carriage return
                 ##print(" : ", grbl_out.strip().decode('utf-8'))
             position = [x, y, z]
-            with open("position.csv", 'w') as csvfile: #update the position of the cnc
+            with open("position.csv", 'w') as csvfile:
                 csvwriter = csv.writer(csvfile)
                 csvwriter.writerow(position)
 
         return measurements, z, stiff
 
-def load_csv(): #load data from csv file
-   with open('measurements.csv', 'r') as file:
+def load_csv(filename): #load data from csv file
+   with open(filename, 'r') as file:
        reader = csv.reader(file)
        data = list(reader)
    cleaned_data = []
@@ -279,20 +220,20 @@ def load_csv(): #load data from csv file
    return cleaned_data
 
 
-def collect_run_data(data, well, stiff): #collect data for specific run from csv file
+def collect_run_data(data, well, stiff, trial): #collect data for specific run from csv file
     well_data = []
     no_contact = []
     run_array = []
     forces = []
     if stiff:
         return run_array
-    for i in range(0, len(data)): #first, gather the data from only the specified well
-        if data[i][0] == well:
+    for i in range(0, len(data)):
+        if data[i][0] == well and data[i][3] == trial:
             values = [data[i][1], data[i][2]]
             well_data.append(values)
     #print(well_data)
     #print("\n")
-    for l in range(1, len(well_data)): #determine at what z-height first contact was made
+    for l in range(1, len(well_data)):
         if float(well_data[l][1]) <= -1*float(well_data[0][0]) + 2*float(well_data[0][1]):
             no_contact.append(l)
         run_array.append([well_data[l][0], well_data[l][1]])
@@ -300,7 +241,7 @@ def collect_run_data(data, well, stiff): #collect data for specific run from csv
     #print("\n")
     #print(no_contact)
     #print("\n")
-    if len(run_array) - int(no_contact[len(no_contact) - 1]) <= 10: #do not analyze if not enough measurements were made
+    if len(run_array) - int(no_contact[len(no_contact) - 1]) <= 10:
         print("Either well was not tested or no data was collected, either because sample was too short or too soft")
         run_array = []
         return run_array
@@ -311,11 +252,11 @@ def collect_run_data(data, well, stiff): #collect data for specific run from csv
     #print(start_val)
     #print(len(well_data))
     #print(run_array[start_val][0])
-    for k in range(0, len(run_array)): #adjust forces by average "zeroed" force and adjust z heights to represent indentation depth
+    for k in range(0, len(run_array)):
         run_array[k][0] = round(-1*(float(run_array[k][0]) - float(well_data[start_val][0])), 2)
         run_array[k][1] = float(run_array[k][1]) + float(well_data[0][0])
         forces.append(run_array[k][1])
-    if forces == [] or max(forces)-min(forces) < 0.04: #do not analyze if sample is too soft
+    if forces == [] or max(forces)-min(forces) < 0.04:
         print("Either well was not tested or no data was collected, either because sample was too short or too soft")
         run_array = []
         return run_array
@@ -323,7 +264,7 @@ def collect_run_data(data, well, stiff): #collect data for specific run from csv
     #print("\n")
     return run_array
 
-def split(run_array): #get force and depth data in separate arrays to adjust individually
+def split(run_array):
     depths = []
     forces = []
     for i in range(0, len(run_array)):
@@ -340,7 +281,6 @@ def find_d_and_f_in_range(run_array): #select data within desired depth range to
             depths.append(run_array[i][0])
     return depths, forces
 
-
 def approximate_height(run_array):
     depths = []
     for i in range(0, len(run_array)):
@@ -353,7 +293,6 @@ def approximate_height(run_array):
     approx_height = 15 - z_pos
     #print(approx_height)
     return approx_height
-
 
 def correct_force(depths, forces, p_ratio, approx_height): #add correction factor based on simulation data since samples are not ideal shapes
     new_array = []
@@ -483,7 +422,7 @@ def correct_force(depths, forces, p_ratio, approx_height): #add correction facto
             else:
                 b = 0.182
                 c = 1.64
-        val = (forces[i])/(1.5364*pow(depths[i], 0.1113))
+        val = (forces[i])/(c*pow(depths[i], b))
         new_array.append(val)
     return new_array
 
@@ -505,14 +444,14 @@ def find_E(A, p_ratio): #determine elastic modulus from curve fit
     E_polymer = 1/E_inv
     return E_polymer
 
-def adjust_E(E): #an empirical correction factor for softer samples which causes issues with getting proper data at small indentation depths
+def adjust_E(E):
     if E < 660000:
-        factor = 457 * pow(E, -0.457)
-        E = E / factor
+        factor = 457*pow(E, -0.457)
+        E = E/factor
     return E
 
 
-def go_home(GRBL_port_path): #ensures device starts at its home position, will not work is device is moved externally
+def go_home(GRBL_port_path):
     n = 1
     with open('position.csv', mode='r') as file:
         csvFile = csv.reader(file)
@@ -532,12 +471,13 @@ def go_home(GRBL_port_path): #ensures device starts at its home position, will n
         home = True
         gcode = f"G01 Z0 F500"
         #print(f"G01 Z0 F500")
-        home_z(GRBL_port_path, gcode, home, x, y, z) #move z up first to prevent accidental contact
+        home_z(GRBL_port_path, gcode, home, x, y, z)
         gcode = f"G01 X0 Y0 F500"
         #print(f"G01 X0 Y0 F500")
-        home_xy(GRBL_port_path, gcode, home, x, y, z) #then move x and y to home position
+        home_xy(GRBL_port_path, gcode, home, x, y, z)
 
 def home_z(GRBL_port_path, gcode, home, x, y, z):
+    # with contect opens file/connection and closes it if function(with) scope is left
     with serial.Serial(GRBL_port_path, BAUD_RATE) as ser:
         send_wake_up(ser)
         cleaned_line = remove_eol_chars(remove_comment(gcode))
@@ -564,11 +504,12 @@ def home_z(GRBL_port_path, gcode, home, x, y, z):
             position = [x, y, z]
 
         #print('End of gcode')
-        with open("position.csv", 'w') as csvfile: #update position of cnc
+        with open("position.csv", 'w') as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(position)
 
 def home_xy(GRBL_port_path, gcode, home, x, y, z):
+    # with contect opens file/connection and closes it if function(with) scope is left
     with serial.Serial(GRBL_port_path, BAUD_RATE) as ser:
         send_wake_up(ser)
         cleaned_line = remove_eol_chars(remove_comment(gcode))
@@ -597,7 +538,7 @@ def home_xy(GRBL_port_path, gcode, home, x, y, z):
             position = [x, y, z]
 
         #print('End of gcode')
-        with open("position.csv", 'w') as csvfile: #update position of cnc
+        with open("position.csv", 'w') as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(position)
 
@@ -623,28 +564,80 @@ if __name__ == "__main__":
     y = {"1": "", "2": "", "3": "", "4": "", "5": "", "6": "", "7": "", "8": "", "9": "", "10": "", "11": "", "12": ""}
     z_up = "-2.50"
     height_offset = 4  # set starting distance between indenter and wells
+    # y_disp = 0.1 #well plate is not precisely aligned, should get fixed in future iterations
     h_speed = "500"  # speed sensor moves between wells
     v_speed = "100"  # speed sensor moves while testing sample
     results = []
 
-    for i in range(0, 8):  # load x values into x dictionary
+    for i in range(0, 8):  # load x values into x dictionairy
         x[cols[i]] = str(x_init + offset * i)
 
-    for j in range(0, 12):  # load y values into y dictionary
+    for j in range(0, 12):  # load y values into y dictionairy
         y[rows[j]] = str(y_init + offset * j)
+
+
+    bad_input = True
+    while bad_input:
+        num_tests = input("Please enter how many tests you would like to be run: ")
+        time_between = input("Please enter how many minutes you would like between set of tests to the nearest whole number: ")
+        if num_tests.isnumeric() and time_between.isnumeric():
+            print(f"Valid inputs, a total of {num_tests} tests will be run with {time_between} minutes in between each test.")
+            bad_input = False
+        else:
+            print("Invalid input, please try again")
+
+    num_tests = int(num_tests)
+    time_between = int(time_between)
+    time_between = round(time_between * 60)
+
+    bad_name = True
+    files = os.listdir("C://Users//dlist//OneDrive//Desktop//Classes//Research//CNC_Programming//Python_G-Code")
+    while bad_name:
+        filename = input(
+            "Please enter the name of the the file you would like to save the data to. The format should have"
+            " no spaces like the following: File_name ")
+        count = 0
+        for i in range(0, len(filename)):
+            if filename[i] == " ":
+                count = count + 1
+        if count > 0:
+            print("Improper filename, file contained a space, please try again")
+            retry = True
+        else:
+            retry = False
+        if not retry:
+            results_filename = filename + "_results_timed.csv"
+            filename = filename + ".csv"
+            if filename in files:
+                bad_answer = True
+                while bad_answer:
+                    overwrite = input("A file with that name already exists, would you like to overwrite it? Y or N: ")
+                    if overwrite.strip() == 'y' or overwrite.strip() == 'Y':
+                        bad_answer = False
+                        bad_name = False
+                        print("Okay, overwriting file")
+                    elif overwrite.strip() == "n" or overwrite.strip() == "N":
+                        bad_answer = False
+                        print("Okay, restarting file naming process")
+                    else:
+                        print("Invalid response, please try again")
+            else:
+                bad_name = False
+    # print(filename)
+    # print(files)
 
     print("Wells can be entered in combinations of different modes. Please note wells will be tested in the order they are entered.")
     print("Also, wells that are entered more than once will be tested only once.")
     modes = ["1", "2", "3", "4"]
     entered = False
-    while not entered: #allows wells to be entered in a combination of different modes
+    while not entered:
         mode = input("Please enter 1 to enter individual wells, 2 to enter a row/rows, 3 to enter a column/columns,\n"
                      " or 4 to enter the entire plate: ")
         while mode not in modes:
             print("Invalid mode, please try again")
             mode = input("Please enter 1 to enter individual wells, 2 to enter a row/rows, 3 to enter a column/columns,\n"
                          " or 4 to enter the entire plate: ")
-        if mode == "1": #allows wells to be entered one at a time
+        if mode == "1":
             more = True
             while more:
                 well = input("Enter a well: ")
@@ -655,7 +648,7 @@ if __name__ == "__main__":
                 else:
                     entry_wells.append(well)  # if valid well is entered, add to wells to be tested
                     print("Valid well, press enter if all wells are entered")
-        if mode == "2": #allows entire rows of wells to be entered at once
+        if mode == "2":
             more = True
             while more:
                 row = input("Enter a row (\"1\", \"2\", ... : ")
@@ -668,7 +661,7 @@ if __name__ == "__main__":
                         well = cols[i] + row
                         entry_wells.append(well)
                     print("Valid row, press enter if all rows are entered")
-        if mode == "3": #allows entire columns of wells to be entered at once
+        if mode == "3":
             more = True
             while more:
                 col = input("Enter a column (\"A\", \"B\", ... : ")
@@ -681,7 +674,7 @@ if __name__ == "__main__":
                         well = col + rows[i]
                         entry_wells.append(well)
                     print("Valid column, press enter if all columns are entered")
-        if mode == "4":  #allows every well in the well plate to be entered at once
+        if mode == "4":
             for j in range(0, len(cols)):
                 for i in range(0, len(rows)):
                     well = cols[j] + rows[i]
@@ -689,7 +682,7 @@ if __name__ == "__main__":
                 print("Valid entry")
         print(entry_wells)
         invalid_answer = True
-        while invalid_answer: #allows user to check that the correct wells will be tested
+        while invalid_answer:
             correct = input("Please confirm that these are the correct wells, \"Y\" or \"N\" ")
             #print(correct)
             if correct.strip() == 'y' or correct.strip() == 'Y':
@@ -701,7 +694,7 @@ if __name__ == "__main__":
             else:
                 print("Invalid response, please try again")
         different_mode = False
-        while not different_mode: #checks if more wells need to be entered
+        while not different_mode:
             correct = input("Are all wells entered?, \"Y\" or \"N\" ")
             if correct.strip() == "y" or correct.strip() == "Y":
                 different_mode = True
@@ -756,195 +749,218 @@ if __name__ == "__main__":
 
     print(f"Okay, testing wells: {wells}")
 
-    #Test machine homing
-    curr_x = 0
-    curr_y = 0
-    home = False
-    for n in range(0, len(wells)):
-        max_time = (len(wells)-n) * 9.2 * 60
-        hrs = math.floor(max_time / 3600)
-        mins = round(max_time / 60) - hrs * 60
-        print(f"Testing well {wells[n]}")
-        print(f"Estimated time remaining is {hrs} hours and {mins} minutes, though times may vary")
-        well = wells[n]
-        col = wells[n][0]
-        X = x[col] #determines coordinates machine needs to move to in x and y direction to reach certain well
-        X = float(X)
-        #print(f"X: {X}")
-        new_X = X-curr_x #determines distance cnc need to move to reach that well
-        #print(f"new_X: {new_X}")
-        new_X = str(new_X)
-        ind = cols.index(col) + 1
-        row = wells[n].lstrip("ABCDEFGH")
-        Y = str(float(y[row]))
-        Y = float(Y)
-        #print(f"Y: {Y}")
-        new_Y = Y-curr_y
-        #print(f"new_Y: {new_Y}")
-        new_Y = str(new_Y)
-        #print(f"G01 X{new_X} Y{new_Y} F{h_speed}")
-        z_int = round(-1*height_offset+1, 2)
-        Z = z_int
-        if n == 0:
-            gcode = f"G01 X{new_X} Y{new_Y} Z{z_int} F{h_speed}"
-        else:
-            gcode = f"G01 X{new_X} Y{new_Y} F{h_speed}"
-        move_gcode(GRBL_port_path, gcode, home, X, Y, Z) #moves cnc to x and y coordinates of current well being tested
-        gcode = []
-        z = -0.02
-        while z >= lowest+1: #creates lines of gcode to indent sample
-            gcode.append(f"G01 Z{z} F{v_speed}")
-            z = round(z-0.02, 2)
-        measurements, z, stiff = stream_gcode(GRBL_port_path, gcode, X, Y, well)
-        gcode = f"G01 Z{-z+Z} F{v_speed}"
-        move_gcode(GRBL_port_path, gcode, home, X, Y, Z) #moves indenter back up to original z height
-        curr_x = X
-        #print(f"curr_X: {curr_x}")
-        curr_y = Y
-        #print(f"curr_Y: {curr_y}")
-        #Save measurements to csv, probably do in function so depth values can be added
-        #Analysis
-        data = load_csv()
-        # print(data)
-        cols = ["A", "B", "C", "D", "E", "F", "G", "H"]
-        rows = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]
-        well = wells[n]
-        run_array = collect_run_data(data, well, stiff) #get data for specified well
-        if run_array != []:
-            well_data = run_array
-            # print(run_array)
-            height = approximate_height(run_array)
-            depths, forces = split(run_array)
-            # pyplot.scatter(depths, forces)
-            # pyplot.show()
-            # print(depths)
-            # print(forces)
-            well_depths = depths
-            well_forces = forces
-            depth_in_range, force_in_range = find_d_and_f_in_range(run_array)
-            # print(depth_in_range)
-            # print(force_in_range)
-            p_ratio = p_ratios[n]
-            adjusted_forces = correct_force(depth_in_range, force_in_range, p_ratio, height)
-            # print(adjusted_forces)
-            depth_in_range = np.asarray(depth_in_range)
-            adjusted_forces = np.asarray(adjusted_forces)
+    max_time = (len(wells) * 9.2 * 60) * num_tests + ((num_tests - 1) * time_between)
+    hrs = math.floor(max_time / 3600)
+    mins = round(max_time / 60) - hrs * 60
+    print(f"Estimated time to run tests is {hrs} hours and {mins} minutes, though times may vary")
 
-
-            def Hertz_func(depth, A, d0):
-                F = A * pow(depth - d0, 1.5)
-                return F
-
-            try: #fit data to a Hertzian contact mechanics function
-                parameters, covariance = curve_fit(Hertz_func, depth_in_range, adjusted_forces, p0=[2, 0.03])
-            except:
-                print("Data could not be analyzed")
-                error = True
+    for trial in range(0, num_tests):
+        #Test machine homing
+        curr_x = 0
+        curr_y = 0
+        home = False
+        for n in range(0, len(wells)):
+            max_time = (len(wells)-n) * 9.2 * 60
+            hrs = math.floor(max_time / 3600)
+            mins = round(max_time / 60) - hrs * 60
+            print(f"Testing well {wells[n]}")
+            #print(f"Estimated time remaining is {hrs} hours and {mins} minutes, though times may vary")
+            well = wells[n]
+            col = wells[n][0]
+            X = x[col]
+            X = float(X)
+            #print(f"X: {X}")
+            new_X = X-curr_x
+            #print(f"new_X: {new_X}")
+            new_X = str(new_X)
+            ind = cols.index(col) + 1
+            row = wells[n].lstrip("ABCDEFGH")
+            Y = str(float(y[row]))
+            Y = float(Y)
+            #print(f"Y: {Y}")
+            new_Y = Y-curr_y
+            #print(f"new_Y: {new_Y}")
+            new_Y = str(new_Y)
+            #print(f"G01 X{new_X} Y{new_Y} F{h_speed}")
+            z_int = round(-1*height_offset+1, 2)
+            Z = z_int
+            if n == 0:
+                gcode = f"G01 X{new_X} Y{new_Y} Z{z_int} F{h_speed}"
             else:
-
+                gcode = f"G01 X{new_X} Y{new_Y} F{h_speed}"
+            move_gcode(GRBL_port_path, gcode, home, X, Y, Z)
+            gcode = []
+            z = -0.02
+            while z >= lowest+1:
+                gcode.append(f"G01 Z{z} F{v_speed}")
+                z = round(z-0.02, 2)
+            measurements, z, stiff = stream_gcode(GRBL_port_path, gcode, X, Y, well, filename, trial)
+            gcode = f"G01 Z{-z+Z} F{v_speed}"
+            move_gcode(GRBL_port_path, gcode, home, X, Y, Z)
+            curr_x = X
+            #print(f"curr_X: {curr_x}")
+            curr_y = Y
+            #print(f"curr_Y: {curr_y}")
+            #Save measurements to csv, probably do in function so depth values can be added
+            #Analysis
+            data = load_csv(filename)
+            # print(data)
+            cols = ["A", "B", "C", "D", "E", "F", "G", "H"]
+            rows = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]
+            well = wells[n]
+            run_array = collect_run_data(data, well, stiff, trial)
+            if run_array != []:
+                well_data = run_array
+                # print(run_array)
+                height = approximate_height(run_array)
+                depths, forces = split(run_array)
+                # pyplot.scatter(depths, forces)
+                # pyplot.show()
+                # print(depths)
+                # print(forces)
+                well_depths = depths
+                well_forces = forces
+                depth_in_range, force_in_range = find_d_and_f_in_range(run_array)
                 # print(depth_in_range)
                 # print(force_in_range)
+                p_ratio = p_ratios[n]
+                adjusted_forces = correct_force(depth_in_range, force_in_range, p_ratio, height)
+                # print(adjusted_forces)
+                depth_in_range = np.asarray(depth_in_range)
+                adjusted_forces = np.asarray(adjusted_forces)
 
-                fit_A = float(parameters[0])
-                fit_d0 = float(parameters[1])
-                # print(fit_A)
-                # print(fit_d0)
-                # pyplot.scatter(depth_in_range, adjusted_forces)
-                # y_var = []
-                # for i in range(0, len(depth_in_range)):
-                # y_var.append(fit_A * pow(depth_in_range[i], 1.5))
-                # pyplot.plot(depth_in_range, y_var)
-                # pyplot.xlabel("Depth (mm)")
-                # pyplot.ylabel("Force (N)")
-                # pyplot.title("Force vs. Indentation Depth")
-                # pyplot.show()
 
-                count = 0
-                continue_to_adjust = True #if improper starting depth was determined using only force data, adjust based on curve fit
-                if abs(fit_d0) < 0.01:
-                    continue_to_adjust = False
-                min_d0 = 100
-                error = False
-                while continue_to_adjust:
-                    count = count + 1
-                    old_d0 = fit_d0
-                    run_array = adjust_depth(run_array, fit_d0)
-                    depth_in_range, force_in_range = find_d_and_f_in_range(run_array)
+                def Hertz_func(depth, A, d0):
+                    F = A * pow(depth - d0, 1.5)
+                    return F
+
+                try:
+                    parameters, covariance = curve_fit(Hertz_func, depth_in_range, adjusted_forces, p0=[2, 0.03])
+                except:
+                    print("Data could not be analyzed")
+                    error = True
+                else:
+
                     # print(depth_in_range)
-                    height = approximate_height(run_array)
-                    adjusted_forces = correct_force(depth_in_range, force_in_range, p_ratio, height)
-                    # print(adjusted_forces)
-                    depth_in_range = np.asarray(depth_in_range)
-                    adjusted_forces = np.asarray(adjusted_forces)
-                    try: #refit to curve
-                        parameters, covariance = curve_fit(Hertz_func, depth_in_range, adjusted_forces, p0=[2, 0.03])
-                    except:
-                        print("Data could not be analyzed")
-                        error = True
-                    else:
-                        fit_A = float(parameters[0])
-                        fit_d0 = float(parameters[1])
-                        # print(fit_A)
-                        # print(fit_d0)
-                        if abs(fit_d0) < min_d0:
-                            min_d0 = abs(fit_d0)
-                        # print(f"min {min_d0}")
-                        # pyplot.scatter(depth_in_range, adjusted_forces)
-                        # y_var = []
-                        # for i in range(0, len(depth_in_range)):
-                        # y_var.append(fit_A * pow(depth_in_range[i], 1.5))
-                        # pyplot.plot(depth_in_range, y_var)
-                        # pyplot.xlabel("Depth (mm)")
-                        # pyplot.ylabel("Force (N)")
-                        # pyplot.title("Force vs. Indentation Depth")
-                        # pyplot.show()
-                        if abs(round(old_d0, 5)) == abs(round(fit_d0, 5)): #sometimes curve fit converges to improper value, nudges it away from convergence
-                            fit_d0 = -0.75 * fit_d0
-                        elif abs(fit_d0) < 0.01:
-                            continue_to_adjust = False
-                            break
-                        elif count > 100 and count < 200: #if optimal value is greater than 0.01, find the lowest obtained optimal value
-                            if abs(round(fit_d0, 2)) == round(min_d0, 2):
-                                break
-                        elif count >= 200 and count < 300:
-                            if abs(round(fit_d0, 1)) == round(min_d0, 1):
-                                break
-                        elif count == 300:
-                            print("Possible error in data analysis")
-                            print(f"Optimal offset depth was {fit_d0}, normally it is < 0.01")
-                            break
+                    # print(force_in_range)
 
-            if not error:
-                E = find_E(fit_A, p_ratio) #find elastic modulus
-                #print(E)
-                E = adjust_E(E) #adjustemnt based on empirical data for softer samples which may cause difficultly in making initial measurements
-                #print(E)
-                E = round(E)
-                if round(max(depth_in_range), 2) < 0.4:
-                    print("Sample was not indented far enough")
-                    print(f"The range the measurement was made with was {round(min(depth_in_range), 2)} mm to {round(max(depth_in_range), 2)} mm")
-                err = np.sqrt(np.diag(covariance))
-                # print(covariance[0][0])
-                std_dev = round(find_E(err[0], p_ratio))
-                #(std_dev)
-                row = [wells[n], E, std_dev]
-                results.append(row)
-                print(f"Well {wells[n]}: E = {E} N/m^2, Uncertainty = {std_dev} N/m^2")
+                    fit_A = float(parameters[0])
+                    fit_d0 = float(parameters[1])
+                    # print(fit_A)
+                    # print(fit_d0)
+                    # pyplot.scatter(depth_in_range, adjusted_forces)
+                    # y_var = []
+                    # for i in range(0, len(depth_in_range)):
+                    # y_var.append(fit_A * pow(depth_in_range[i], 1.5))
+                    # pyplot.plot(depth_in_range, y_var)
+                    # pyplot.xlabel("Depth (mm)")
+                    # pyplot.ylabel("Force (N)")
+                    # pyplot.title("Force vs. Indentation Depth")
+                    # pyplot.show()
+
+                    count = 0
+                    continue_to_adjust = True
+                    if abs(fit_d0) < 0.01:
+                        continue_to_adjust = False
+                    min_d0 = 100
+                    error = False
+                    while continue_to_adjust:
+                        count = count + 1
+                        old_d0 = fit_d0
+                        run_array = adjust_depth(run_array, fit_d0)
+                        depth_in_range, force_in_range = find_d_and_f_in_range(run_array)
+                        # print(depth_in_range)
+                        height = approximate_height(run_array)
+                        adjusted_forces = correct_force(depth_in_range, force_in_range, p_ratio, height)
+                        # print(adjusted_forces)
+                        depth_in_range = np.asarray(depth_in_range)
+                        adjusted_forces = np.asarray(adjusted_forces)
+                        try:
+                            parameters, covariance = curve_fit(Hertz_func, depth_in_range, adjusted_forces, p0=[2, 0.03])
+                        except:
+                            print("Data could not be analyzed")
+                            error = True
+                        else:
+                            fit_A = float(parameters[0])
+                            fit_d0 = float(parameters[1])
+                            # print(fit_A)
+                            # print(fit_d0)
+                            if abs(fit_d0) < min_d0:
+                                min_d0 = abs(fit_d0)
+                            # print(f"min {min_d0}")
+                            # pyplot.scatter(depth_in_range, adjusted_forces)
+                            # y_var = []
+                            # for i in range(0, len(depth_in_range)):
+                            # y_var.append(fit_A * pow(depth_in_range[i], 1.5))
+                            # pyplot.plot(depth_in_range, y_var)
+                            # pyplot.xlabel("Depth (mm)")
+                            # pyplot.ylabel("Force (N)")
+                            # pyplot.title("Force vs. Indentation Depth")
+                            # pyplot.show()
+                            if abs(round(old_d0, 5)) == abs(round(fit_d0, 5)):
+                                fit_d0 = -0.75 * fit_d0
+                            elif abs(fit_d0) < 0.01:
+                                continue_to_adjust = False
+                                break
+                            elif count > 100 and count < 200:
+                                if abs(round(fit_d0, 2)) == round(min_d0, 2):
+                                    break
+                            elif count >= 200 and count < 300:
+                                if abs(round(fit_d0, 1)) == round(min_d0, 1):
+                                    break
+                            elif count == 300:
+                                print("Error in data analysis")
+                                error = True
+                                break
+
+                if not error:
+                    E = find_E(fit_A, p_ratio)
+                    #print(E)
+                    E = adjust_E(E)
+                    ##print(E)
+                    E = round(E)
+                    if round(max(depth_in_range), 2) < 0.4:
+                        print("Sample was not indented far enough")
+                        print(f"The range the measurement was made with was {round(min(depth_in_range), 2)} mm to {round(max(depth_in_range), 2)} mm")
+                    err = np.sqrt(np.diag(covariance))
+                    # print(covariance[0][0])
+                    std_dev = round(find_E(err[0], p_ratio))
+                    ##(std_dev)
+                    now = datetime.now()
+                    row = [wells[n], E, std_dev, now]
+                    results.append(row)
+                    print(f"Well {wells[n]}: E = {E} N/m^2, Uncertainty = {std_dev} N/m^2 at {now}")
+                    with open(results_filename, 'a') as csvfile:
+                        csvwriter = csv.writer(csvfile)
+                        csvwriter.writerow(row)
+                else:
+                    now = datetime.now()
+                    row = [wells[n], "no data", "no data", now]
+                    results.append(row)
+                    with open(results_filename, 'a') as csvfile:
+                        csvwriter = csv.writer(csvfile)
+                        csvwriter.writerow(row)
             else:
-                row = [wells[n], "no data", "no data"]
+                now = datetime.now()
+                row = [wells[n], "no data", "no data", now]
                 results.append(row)
-        else:
-            row = [wells[n], "no data", "no data"]
-            results.append(row)
+                with open(results_filename, 'a') as csvfile:
+                    csvwriter = csv.writer(csvfile)
+                    csvwriter.writerow(row)
 
 
-    home = True #move machine home
-    gcode = f"G01 X0 Y0 Z0 F500"
-    ##print(f"G01 X0 Y0 Z0 F500")
-    move_gcode(GRBL_port_path, gcode, home, round(curr_x, 2), round(curr_y, 2), round(Z, 2))
-    print("Here are the results:")
-    for l in range(0, len(results)):
-        print(f"Well {results[l][0]}: E = {results[l][1]} N/m^2, Uncertainty = {results[l][2]} N/m^2")
+        home = True
+        gcode = f"G01 X0 Y0 Z0 F500"
+        ##print(f"G01 X0 Y0 Z0 F500")
+        move_gcode(GRBL_port_path, gcode, home, round(curr_x, 2), round(curr_y, 2), round(Z, 2))
+        #print("Here are the results:")
+        #for l in range(0, len(results)):
+            #print(f"Well {results[l][0]}: E = {results[l][1]} N/m^2, Uncertainty = {results[l][2]} N/m^2")
+        print("Testing in progress! Please do not touch anything!")
+        time.sleep(time_between)
+
+    print("Testing is complete! Please us the analysis_over_time program to view the results for each well.")
+
 
 
 
