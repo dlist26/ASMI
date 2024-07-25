@@ -318,7 +318,7 @@ def collect_run_data(data, well, stiff): #collect data for specific run from csv
     #print(run_array[start_val][0])
     for k in range(0, len(run_array)): #format data for analysis
         run_array[k][0] = round(-1*(float(run_array[k][0]) - float(well_data[start_val][0])), 2) #set indentation depths relative to initial contact height
-        run_array[k][1] = float(run_array[k][1]) + float(well_data[0][0]) #zero force
+        run_array[k][1] = float(run_array[k][1]) + float(well_data[0][0]) #zero forces
         forces.append(run_array[k][1])
     if forces == [] or max(forces)-min(forces) < 0.04: #check that force measurements were large enough to make proper measurement
         print("Either well was not tested or no data was collected, either because sample was too short or too soft")
@@ -843,7 +843,6 @@ if __name__ == "__main__":
         #print(f"curr_X: {curr_x}")
         curr_y = Y #set new y position
         #print(f"curr_Y: {curr_y}")
-        #Save measurements to csv, probably do in function so depth values can be added
         #Analysis
         data = load_csv(filename)
         # print(data)
