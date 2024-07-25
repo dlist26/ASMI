@@ -933,7 +933,3 @@ if __name__ == "__main__":
     print("Here are the results:")
     for l in range(0, len(results)):
         print(f"Well {results[l][0]}: E = {results[l][1]} N/m^2, Uncertainty = {results[l][2]} N/m^2")
-
-
-
-
