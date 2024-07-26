@@ -1,3 +1,7 @@
+"""
+This is the analysis script to display results from measurements made using the measure and custom_measure programs
+"""
+
 import csv
 import sys
 import time
@@ -6,12 +10,12 @@ import matplotlib.pyplot as pyplot
 from scipy.optimize import curve_fit
 import os
 
-
 files = os.listdir("/home/robot/ASMI_KABlab") #change to correct directory for your device!!!
+
 
 def load_csv(): #load data from csv file
    bad_name = True
-   while bad_name:
+   while bad_name: #select file to obtain data from
         filename = input(
             "Please enter the name of the the file you would like to analyze the data from. The name is case"
             " sensitive, so please enter the name in exactly. To see a list of all files, press Ctrl + C and"
@@ -40,7 +44,7 @@ def collect_run_data(data, well): #collect data for specific run from csv file
     run_array = []
     forces = []
     for i in range(0, len(data)):
-        if data[i][0] == well:
+        if data[i][0] == well: #collect data from specified well
             values = [data[i][1], data[i][2]]
             well_data.append(values)
     #print(well_data)
@@ -49,34 +53,34 @@ def collect_run_data(data, well): #collect data for specific run from csv file
         print("Well was not tested")
         sys.exit()
     for l in range(1, len(well_data)):
-        if float(well_data[l][1]) <= -1*float(well_data[0][0]) + 2*float(well_data[0][1]):
+        if float(well_data[l][1]) <= -1*float(well_data[0][0]) + 2*float(well_data[0][1]): #determine which measurements correspond to contact
             no_contact.append(l)
         run_array.append([well_data[l][0], well_data[l][1]])
     #print(run_array)
     #print("\n")
     #print(no_contact)
     #print("\n")
-    if len(run_array) - int(no_contact[len(no_contact) - 1]) <= 10:
+    if len(run_array) - int(no_contact[len(no_contact) - 1]) <= 10: #check if no or not enough data was collected for well
         print("Either well was not tested or no data was collected, either because sample was too short or too soft")
         run_array = []
         sys.exit()
-    if len(no_contact) > 0:
+    if len(no_contact) > 0: #find index of first continuous contact measurement
         start_val = int(no_contact[len(no_contact)-1]+1)
     else:
         start_val = 0
     #print(start_val)
     #print(len(well_data))
     #print(run_array[start_val][0])
-    for k in range(0, len(run_array)):
-        run_array[k][0] = round(-1*(float(run_array[k][0]) - float(well_data[start_val][0])), 2)
-        run_array[k][1] = float(run_array[k][1]) + float(well_data[0][0])
+    for k in range(0, len(run_array)): #format data for analysis
+        run_array[k][0] = round(-1*(float(run_array[k][0]) - float(well_data[start_val][0])), 2) #set indentation depths relative to initial contact height
+        run_array[k][1] = float(run_array[k][1]) + float(well_data[0][0]) #zero forces
         forces.append(run_array[k][1])
-    if forces == [] or max(forces)-min(forces) < 0.04:
+    if forces == [] or max(forces)-min(forces) < 0.04: #check that force measurements were large enough to make proper measurement
         print("Either well was not tested or no data was collected, either because sample was too short or too soft")
         run_array = []
         sys.exit()
     get_ratio = True
-    while get_ratio:
+    while get_ratio: #obtain Poisson's ratios for specified sample
         p_ratio = input("What is the approximate Poisson's Ratio of the sample? Value should be between 0.3-0.5. ")
         cleaned_input = p_ratio.replace(".", "1")
         if cleaned_input.isnumeric() and float(p_ratio) >= 0.3 and float(p_ratio) <= 0.5:
@@ -86,7 +90,7 @@ def collect_run_data(data, well): #collect data for specific run from csv file
             print("Improper Poisson's Ratio, please try again.")
     return run_array, p_ratio
 
-def approximate_height(run_array):
+def approximate_height(run_array): #find height of sample to determine correction equation used
     depths = []
     for i in range(0, len(run_array)):
         depths.append(run_array[i][0])
@@ -99,7 +103,7 @@ def approximate_height(run_array):
     #print(approx_height)
     return approx_height
 
-def split(run_array):
+def split(run_array): #splits data from well into separate depth and force arrays
     depths = []
     forces = []
     for i in range(0, len(run_array)):
@@ -267,7 +271,7 @@ def find_E(A, p_ratio): #determine elastic modulus from curve fit
     E_polymer = 1/E_inv
     return E_polymer
 
-def adjust_E(E):
+def adjust_E(E): #an empirical correction factor for softer samples which causes issues with getting proper data at small indentation depths
     if E < 660000:
         factor = 457 * pow(E, -0.457)
         E = E/factor
@@ -280,7 +284,7 @@ data = load_csv()
 cols = ["A", "B", "C", "D", "E", "F", "G", "H"]
 rows = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]
 invalid = True
-while invalid: #obtain wells to be tested
+while invalid: #obtain well to be analyzed
    well = input("Enter a well: ")
    if well[0] not in cols or well.lstrip("ABCDEFGH") not in rows: #error check if invalid well is entered
        print("Error, please try again")
@@ -312,7 +316,7 @@ def Hertz_func(depth, A, d0):
 
 
 
-try:
+try: #fit data to Hertzian contact mechanics
     parameters, covariance = curve_fit(Hertz_func, depth_in_range, adjusted_forces, p0=[2, 0.03])
 except:
     print("Data could not be analyzed")
@@ -337,7 +341,7 @@ else:
     #pyplot.title("Force vs. Indentation Depth")
     #pyplot.show()
 
-    count = 0
+    count = 0 #adjust if approximate initial depth was incorrect
     continue_to_adjust = True
     if abs(fit_d0) < 0.01:
         continue_to_adjust = False
@@ -375,7 +379,7 @@ else:
             #pyplot.ylabel("Force (N)")
             #pyplot.title("Force vs. Indentation Depth")
             #pyplot.show()
-            if abs(round(old_d0, 5)) == abs(round(fit_d0, 5)):
+            if abs(round(old_d0, 5)) == abs(round(fit_d0, 5)): #if fit continues to converge to improper value
                 fit_d0 = -0.75 * fit_d0
             elif abs(fit_d0) < 0.01:
                 continue_to_adjust = False
@@ -390,7 +394,7 @@ else:
                 print("Fit quality may be poor")
                 break
 
-    E = find_E(fit_A, p_ratio)
+    E = find_E(fit_A, p_ratio) #determine elastic modulus from measurements
     #print(E)
     E = adjust_E(E)
     E = round(E)
@@ -408,7 +412,7 @@ else:
     y_var = []
     for i in range(0, len(depth_in_range)):
        y_var.append(fit_A * pow(depth_in_range[i], 1.5))
-    pyplot.plot(depth_in_range, y_var)
+    pyplot.plot(depth_in_range, y_var) #plot data and curve fit
     pyplot.xlabel("Depth (mm)")
     pyplot.ylabel("Force (N)")
     pyplot.title(f"Force vs. Indentation Depth of Well {well}")
