@@ -819,7 +819,6 @@ if __name__ == "__main__":
     print(f"Estimated time to run tests is {hrs} hours and {mins} minutes, though times may vary")
 
     for trial in range(0, num_tests):
-        #Test machine homing
         curr_x = 0
         curr_y = 0
         home = False
