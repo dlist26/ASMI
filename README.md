@@ -1,4 +1,4 @@
 # ASMI
-This repository contains every file used for an Automated Soft Matter Indenter which can be used to determine the mechanical properties of samples.
-Included are a users' manual, CAD models for the necessary 3D parts, and a variety of python programs to take measurements and test that the device is working properly.
-To start, please see the Users' Manual
+The Automated Soft Matter Indenter (ASMI) is a platform for rapidly performing mechanical characterization of samples with elastic moduli in the range 7 kPa to 67 MPa with a sample acquisition time between 1 and 10 minutes. It is a low-cost system based upon open-source software, a modified mill, and an educational force sensor with a total bill of materials < $500. This system tests batches of up to 96 samples based on a standard well-plate sample holder without requiring any human intervention. Using the ASMI, users can programmably obtain mechanical data in a manner that enables high-throughput workflows, precisely testing time-dependent phenomena, and integration with other processing steps for closed-loop optimization.
+
+This repository contains every file necessary to recreate the ASMI as well as some programs which can be used to test the system and make measurements with it. Users can also customize the ASMI to better fit their needs.
